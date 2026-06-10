@@ -117,7 +117,7 @@ public class OciServiceImpl implements IOciService {
     public final static Map<String, Object> TEMP_MAP = new ConcurrentHashMap<>();
     public final static Map<String, ScheduledFuture<?>> TASK_MAP = new ConcurrentHashMap<>();
     public final static ScheduledThreadPoolExecutor CREATE_INSTANCE_POOL = new ScheduledThreadPoolExecutor(
-            Math.min(4, Runtime.getRuntime().availableProcessors()),
+            Math.max(8, Runtime.getRuntime().availableProcessors() * 2),
             ThreadFactoryBuilder.create().setNamePrefix("oci-task-").build());
     public final static Set<String> RUNNING_TASKS = ConcurrentHashMap.newKeySet();
 
@@ -1145,7 +1145,9 @@ public class OciServiceImpl implements IOciService {
             IOciCreateTaskService createTaskService) {
 
         String taskId = CommonUtils.CREATE_TASK_PREFIX + sysUserDTO.getTaskId();
-        // 检查是否已经有同一个任务在运行
+        // 防止同一任务并发执行。
+        // RUNNING_TASKS 标志只在 finally 块中清除，禁止在 stopAndRemoveTask 中提前移除，
+        // 否则会在标志被清除到 finally 执行之间产生竞态窗口，导致下一轮调度趁虚而入、重复开机。
         if (!RUNNING_TASKS.add(taskId)) {
 //            log.warn("【开机任务】任务 [{}] 已在运行中,跳过本轮执行", taskId);
             return;
@@ -1169,6 +1171,7 @@ public class OciServiceImpl implements IOciService {
                 sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
+                return;
             }
 
             if (noPubVcnCounts > 0) {
@@ -1179,6 +1182,7 @@ public class OciServiceImpl implements IOciService {
                 sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 无有效公网 VCN,且无法再创建 VCN,请删除无效的私网 VCN",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
+                return;
             }
 
             if (noShapeCounts > 0) {
@@ -1189,16 +1193,11 @@ public class OciServiceImpl implements IOciService {
                 sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 因不支持 CPU 架构:[%s] 或配额不足而终止任务",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers(), sysUserDTO.getArchitecture()));
+                return;
             }
 
             if (sysUserDTO.getCreateNumbers() == outCounts) {
 //                stopAndRemoveTask(sysUserDTO, createTaskService);
-//                log.error("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 因超额而终止任务...",
-//                        sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
-//                        sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers());
-//                sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 因超额而终止任务",
-//                        sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
-//                        sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
                 sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 官方提示配额已超过限制,但任务未终止",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
@@ -1209,6 +1208,7 @@ public class OciServiceImpl implements IOciService {
                 log.warn("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 任务结束...",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers());
+                return;
             }
 
             if (leftCreateNum > 0) {
@@ -1240,7 +1240,8 @@ public class OciServiceImpl implements IOciService {
 //                    sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
             }
         } finally {
-            // 确保任务执行完毕后清除运行标志
+            // 统一在此处清除运行标志，禁止在 stopAndRemoveTask 中移除，
+            // 否则会产生竞态窗口，导致下一轮调度趁虚而入、重复开机。
             RUNNING_TASKS.remove(taskId);
         }
     }
@@ -1249,7 +1250,9 @@ public class OciServiceImpl implements IOciService {
         TEMP_MAP.remove(CommonUtils.CREATE_COUNTS_PREFIX + sysUserDTO.getTaskId());
         stopTask(CommonUtils.CREATE_TASK_PREFIX + sysUserDTO.getTaskId());
         createTaskService.remove(new LambdaQueryWrapper<OciCreateTask>().eq(OciCreateTask::getId, sysUserDTO.getTaskId()));
-        RUNNING_TASKS.remove(CommonUtils.CREATE_TASK_PREFIX + sysUserDTO.getTaskId());
+        // 注意：此处不能移除 RUNNING_TASKS 中的标志，必须由 execCreate 的 finally 块统一清除。
+        // 若在此处提前移除，会在本方法返回与 finally 执行之间产生竞态窗口，
+        // 导致下一轮调度趁虚而入、重复执行开机操作。
     }
 
     public void execChange(ChangeIpParams params,
