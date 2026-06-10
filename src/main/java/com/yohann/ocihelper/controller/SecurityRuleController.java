@@ -5,6 +5,7 @@ import com.yohann.ocihelper.bean.ResponseData;
 import com.yohann.ocihelper.bean.params.oci.securityrule.AddEgressSecurityRuleParams;
 import com.yohann.ocihelper.bean.params.oci.securityrule.AddIngressSecurityRuleParams;
 import com.yohann.ocihelper.bean.params.oci.securityrule.GetSecurityRuleListPageParams;
+import com.yohann.ocihelper.bean.params.oci.securityrule.ReleaseSecurityRuleByVcnParams;
 import com.yohann.ocihelper.bean.params.oci.securityrule.RemoveSecurityRuleParams;
 import com.yohann.ocihelper.bean.response.oci.securityrule.SecurityRuleListRsp;
 import com.yohann.ocihelper.service.ISecurityRuleService;
@@ -53,5 +54,11 @@ public class SecurityRuleController {
     public ResponseData<Void> remove(@Validated @RequestBody RemoveSecurityRuleParams params){
         securityRuleService.remove(params);
         return ResponseData.successData();
+    }
+
+    @RequestMapping("/release")
+    public ResponseData<Void> release(@Validated @RequestBody ReleaseSecurityRuleByVcnParams params){
+        securityRuleService.releaseByVcn(params);
+        return ResponseData.successData("放行安全列表所有端口及协议成功");
     }
 }

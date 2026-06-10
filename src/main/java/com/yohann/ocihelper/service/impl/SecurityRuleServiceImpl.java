@@ -10,6 +10,7 @@ import com.yohann.ocihelper.bean.Tuple2;
 import com.yohann.ocihelper.bean.constant.CacheConstant;
 import com.yohann.ocihelper.bean.dto.SysUserDTO;
 import com.yohann.ocihelper.bean.params.oci.securityrule.*;
+import com.yohann.ocihelper.bean.params.oci.securityrule.ReleaseSecurityRuleByVcnParams;
 import com.yohann.ocihelper.bean.response.oci.securityrule.SecurityRuleListRsp;
 import com.yohann.ocihelper.bean.response.oci.vcn.VcnPageRsp;
 import com.yohann.ocihelper.config.OracleInstanceFetcher;
@@ -309,6 +310,25 @@ public class SecurityRuleServiceImpl implements ISecurityRuleService {
         } catch (Exception e) {
             log.error("删除安全规则失败", e);
             throw new OciException(-1, "删除安全规则失败");
+        }
+        customCache.remove(CacheConstant.PREFIX_INGRESS_SECURITY_RULE_PAGE + params.getOciCfgId());
+        customCache.remove(CacheConstant.PREFIX_EGRESS_SECURITY_RULE_PAGE + params.getOciCfgId());
+        customCache.remove(CacheConstant.PREFIX_INGRESS_SECURITY_RULE_MAP + params.getVcnId());
+        customCache.remove(CacheConstant.PREFIX_EGRESS_SECURITY_RULE_MAP + params.getVcnId());
+    }
+
+    @Override
+    public void releaseByVcn(ReleaseSecurityRuleByVcnParams params) {
+        SysUserDTO sysUserDTO = sysService.getOciUser(params.getOciCfgId());
+        try (OracleInstanceFetcher fetcher = new OracleInstanceFetcher(sysUserDTO)) {
+            Vcn vcn = fetcher.getVcnById(params.getVcnId());
+            fetcher.releaseSecurityRule(vcn, 0, "0.0.0.0/0", "::/0");
+            log.info("用户:[{}],区域:[{}],放行 vcn: [{}] 安全列表所有端口及协议成功",
+                    sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(), vcn.getDisplayName());
+        } catch (Exception e) {
+            log.error("用户:[{}],放行 vcn:[{}] 安全列表所有端口及协议失败,原因:{}",
+                    params.getOciCfgId(), params.getVcnId(), e.getLocalizedMessage(), e);
+            throw new OciException(-1, "放行安全列表所有端口及协议失败");
         }
         customCache.remove(CacheConstant.PREFIX_INGRESS_SECURITY_RULE_PAGE + params.getOciCfgId());
         customCache.remove(CacheConstant.PREFIX_EGRESS_SECURITY_RULE_PAGE + params.getOciCfgId());
