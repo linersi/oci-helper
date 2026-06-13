@@ -140,7 +140,8 @@ public class OciServiceImpl implements IOciService {
 
                     }
                     if (StringUtils.isNotBlank(x.getCreateTime())) {
-                        x.setCreateTime(x.getCreateTime() + String.format("（%s）", CommonUtils.getTimeDifference(LocalDateTime.parse(x.getCreateTime(), CommonUtils.DATETIME_FMT_NORM))));
+                        x.setCreateTime(x.getCreateTime() + String.format("（%s）", CommonUtils.getTimeDifference(
+                                LocalDateTime.parse(x.getCreateTime(), CommonUtils.DATETIME_FMT_NORM))));
                     }
                 });
         return CommonUtils.buildPage(list, params.getPageSize(), params.getCurrentPage(), total);
@@ -149,7 +150,8 @@ public class OciServiceImpl implements IOciService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void addCfg(AddCfgParams params) {
-        List<OciUser> ociUserList = userService.list(new LambdaQueryWrapper<OciUser>().eq(OciUser::getUsername, params.getUsername()));
+        List<OciUser> ociUserList = userService
+                .list(new LambdaQueryWrapper<OciUser>().eq(OciUser::getUsername, params.getUsername()));
         if (ociUserList.size() != 0) {
             throw new OciException(-1, "当前配置名称已存在");
         }
@@ -157,7 +159,8 @@ public class OciServiceImpl implements IOciService {
         String priKeyPath = keyDirPath + File.separator + params.getFile().getOriginalFilename();
         File priKey = FileUtil.touch(priKeyPath);
         try (InputStream inputStream = params.getFile().getInputStream();
-             BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(Files.newOutputStream(priKey.toPath()))) {
+             BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(
+                     Files.newOutputStream(priKey.toPath()))) {
             IoUtil.copy(inputStream, bufferedOutputStream);
         } catch (Exception e) {
             throw new OciException(-1, "写入私钥文件失败");
@@ -182,7 +185,8 @@ public class OciServiceImpl implements IOciService {
                         .privateKeyPath(ociUser.getOciKeyPath())
                         .build())
                 .build();
-        // Quick connectivity check — reject immediately on failure, and record account status
+        // Quick connectivity check — reject immediately on failure, and record account
+        // status
         try (OracleInstanceFetcher fetcher = new OracleInstanceFetcher(sysUserDTO)) {
             fetcher.getAvailabilityDomains();
             // Alive check passed: mark account as ACTIVE
@@ -205,9 +209,10 @@ public class OciServiceImpl implements IOciService {
                 // 获取租户名称
                 try {
                     Tenancy tenancy = asyncFetcher.getIdentityClient().getTenancy(
-                            GetTenancyRequest.builder()
-                                    .tenancyId(asyncUserDTO.getOciCfg().getTenantId())
-                                    .build()).getTenancy();
+                                    GetTenancyRequest.builder()
+                                            .tenancyId(asyncUserDTO.getOciCfg().getTenantId())
+                                            .build())
+                            .getTenancy();
                     update.setTenantName(tenancy.getName());
                 } catch (Exception e) {
                     log.warn("异步获取配置:[{}] 租户名称失败: {}", savedUserId, e.getLocalizedMessage());
@@ -276,8 +281,8 @@ public class OciServiceImpl implements IOciService {
         sysUserDTO.setOperationSystem(params.getOperationSystem());
         sysUserDTO.setRootPassword(params.getRootPassword());
         sysUserDTO.setJoinChannelBroadcast(params.isJoinChannelBroadcast());
-        addTask(CommonUtils.CREATE_TASK_PREFIX + taskId, () ->
-                        execCreate(sysUserDTO, sysService, instanceService, createTaskService),
+        addTask(CommonUtils.CREATE_TASK_PREFIX + taskId,
+                () -> execCreate(sysUserDTO, sysService, instanceService, createTaskService),
                 0, params.getInterval(), TimeUnit.SECONDS);
         String beginCreateMsg = String.format(CommonUtils.BEGIN_CREATE_MESSAGE_TEMPLATE,
                 sysUserDTO.getUsername(),
@@ -299,8 +304,8 @@ public class OciServiceImpl implements IOciService {
             customCache.remove(CacheConstant.PREFIX_INSTANCE_PAGE + params.getCfgId());
             customCache.remove(CacheConstant.PREFIX_NETWORK_LOAD_BALANCER + params.getCfgId());
         }
-        List<OciCfgDetailsRsp.InstanceInfo> instanceInfos =
-                (List<OciCfgDetailsRsp.InstanceInfo>) customCache.get(CacheConstant.PREFIX_INSTANCE_PAGE + params.getCfgId());
+        List<OciCfgDetailsRsp.InstanceInfo> instanceInfos = (List<OciCfgDetailsRsp.InstanceInfo>) customCache
+                .get(CacheConstant.PREFIX_INSTANCE_PAGE + params.getCfgId());
 
         SysUserDTO sysUserDTO = getOciUser(params.getCfgId());
         OciCfgDetailsRsp rsp = new OciCfgDetailsRsp();
@@ -322,15 +327,17 @@ public class OciServiceImpl implements IOciService {
             rsp.setInstanceList(instanceInfos);
         }
 
-        List<OciCfgDetailsRsp.NetLoadBalancer> netLoadBalancers =
-                (List<OciCfgDetailsRsp.NetLoadBalancer>) customCache.get(CacheConstant.PREFIX_NETWORK_LOAD_BALANCER + params.getCfgId());
+        List<OciCfgDetailsRsp.NetLoadBalancer> netLoadBalancers = (List<OciCfgDetailsRsp.NetLoadBalancer>) customCache
+                .get(CacheConstant.PREFIX_NETWORK_LOAD_BALANCER + params.getCfgId());
         if (ObjUtil.isEmpty(netLoadBalancers)) {
             try (OracleInstanceFetcher fetcher = new OracleInstanceFetcher(sysUserDTO);) {
                 NetworkLoadBalancerClient networkLoadBalancerClient = fetcher.getNetworkLoadBalancerClient();
-                List<NetworkLoadBalancerSummary> networkLoadBalancerSummaries = networkLoadBalancerClient.listNetworkLoadBalancers(ListNetworkLoadBalancersRequest.builder()
-                        .compartmentId(fetcher.getCompartmentId())
-                        .lifecycleState(LifecycleState.Active)
-                        .build()).getNetworkLoadBalancerCollection().getItems();
+                List<NetworkLoadBalancerSummary> networkLoadBalancerSummaries = networkLoadBalancerClient
+                        .listNetworkLoadBalancers(ListNetworkLoadBalancersRequest.builder()
+                                .compartmentId(fetcher.getCompartmentId())
+                                .lifecycleState(LifecycleState.Active)
+                                .build())
+                        .getNetworkLoadBalancerCollection().getItems();
                 List<OciCfgDetailsRsp.NetLoadBalancer> nlbList = Optional.ofNullable(networkLoadBalancerSummaries)
                         .filter(CollectionUtil::isNotEmpty).orElseGet(Collections::emptyList).stream()
                         .map(x -> {
@@ -359,7 +366,8 @@ public class OciServiceImpl implements IOciService {
         }
 
         customCache.put(CacheConstant.PREFIX_INSTANCE_PAGE + params.getCfgId(), rsp.getInstanceList(), 10 * 60 * 1000);
-        customCache.put(CacheConstant.PREFIX_NETWORK_LOAD_BALANCER + params.getCfgId(), rsp.getNlbList(), 10 * 60 * 1000);
+        customCache.put(CacheConstant.PREFIX_NETWORK_LOAD_BALANCER + params.getCfgId(), rsp.getNlbList(),
+                10 * 60 * 1000);
 
         rsp.setCfCfgList(Optional.ofNullable(cfCfgService.list())
                 .filter(CollectionUtil::isNotEmpty).orElseGet(Collections::emptyList).stream()
@@ -406,7 +414,7 @@ public class OciServiceImpl implements IOciService {
                 params,
                 sysUserDTO,
                 instanceService,
-                60), 0, 60, TimeUnit.SECONDS);
+                60, null), 0, 60, TimeUnit.SECONDS);
     }
 
     @Override
@@ -419,7 +427,8 @@ public class OciServiceImpl implements IOciService {
             taskIds.forEach(x -> TEMP_MAP.remove(CommonUtils.CREATE_COUNTS_PREFIX + x));
             taskIds.forEach(taskId -> stopTask(CommonUtils.CREATE_TASK_PREFIX + taskId));
         }
-        createTaskService.remove(new LambdaQueryWrapper<OciCreateTask>().eq(OciCreateTask::getUserId, params.getUserId()));
+        createTaskService
+                .remove(new LambdaQueryWrapper<OciCreateTask>().eq(OciCreateTask::getUserId, params.getUserId()));
     }
 
     @Override
@@ -431,7 +440,8 @@ public class OciServiceImpl implements IOciService {
     @Override
     public Page<CreateTaskRsp> createTaskPage(CreateTaskPageParams params) {
         long offset = (params.getCurrentPage() - 1) * params.getPageSize();
-        List<CreateTaskRsp> list = createTaskMapper.createTaskPage(offset, params.getPageSize(), params.getKeyword(), params.getArchitecture());
+        List<CreateTaskRsp> list = createTaskMapper.createTaskPage(offset, params.getPageSize(), params.getKeyword(),
+                params.getArchitecture());
         Long total = createTaskMapper.createTaskPageTotal(params.getKeyword(), params.getArchitecture());
         list.parallelStream().forEach(x -> {
             Long counts = (Long) TEMP_MAP.get(CommonUtils.CREATE_COUNTS_PREFIX + x.getId());
@@ -459,7 +469,8 @@ public class OciServiceImpl implements IOciService {
             throw new OciException(-1, "任务不存在");
         }
 
-        // Step 2: stop the currently running scheduled future (does NOT delete DB record)
+        // Step 2: stop the currently running scheduled future (does NOT delete DB
+        // record)
         stopTask(CommonUtils.CREATE_TASK_PREFIX + params.getTaskId());
         // Clear the attempt counter so the new task starts from 0
         TEMP_MAP.remove(CommonUtils.CREATE_COUNTS_PREFIX + params.getTaskId());
@@ -628,7 +639,8 @@ public class OciServiceImpl implements IOciService {
             return instanceParams;
         }).collect(Collectors.toList());
 
-        // Stagger task submission: each task is submitted 5 seconds after the previous one,
+        // Stagger task submission: each task is submitted 5 seconds after the previous
+        // one,
         // preventing all tasks from hitting the API simultaneously.
         for (int i = 0; i < list.size(); i++) {
             final CreateInstanceParams item = list.get(i);
@@ -720,9 +732,10 @@ public class OciServiceImpl implements IOciService {
                 // 获取租户名称
                 try {
                     Tenancy tenancy = asyncFetcher.getIdentityClient().getTenancy(
-                            GetTenancyRequest.builder()
-                                    .tenancyId(asyncDTO.getOciCfg().getTenantId())
-                                    .build()).getTenancy();
+                                    GetTenancyRequest.builder()
+                                            .tenancyId(asyncDTO.getOciCfg().getTenantId())
+                                            .build())
+                            .getTenancy();
                     update.setTenantName(tenancy.getName());
                 } catch (Exception e) {
                     log.warn("异步获取配置:[{}] 租户名称失败: {}", savedUser.getUsername(), e.getLocalizedMessage());
@@ -785,7 +798,8 @@ public class OciServiceImpl implements IOciService {
         SysUserDTO sysUserDTO = getOciUser(params.getOciCfgId());
         virtualExecutor.execute(() -> {
             try (OracleInstanceFetcher fetcher = new OracleInstanceFetcher(sysUserDTO)) {
-                fetcher.terminateInstance(params.getInstanceId(), params.getPreserveBootVolume().equals(1), params.getPreserveBootVolume().equals(1));
+                fetcher.terminateInstance(params.getInstanceId(), params.getPreserveBootVolume().equals(1),
+                        params.getPreserveBootVolume().equals(1));
                 String message = String.format(CommonUtils.TERMINATE_INSTANCE_MESSAGE_TEMPLATE,
                         sysUserDTO.getUsername(),
                         LocalDateTime.now().format(DateTimeFormatter.ofPattern(DatePattern.NORM_DATETIME_PATTERN)),
@@ -804,7 +818,8 @@ public class OciServiceImpl implements IOciService {
     public void sendCaptcha(SendCaptchaParams params) {
         SysUserDTO sysUserDTO = getOciUser(params.getOciCfgId());
         String verificationCode = RandomUtil.randomString(6);
-        customCache.put(CommonUtils.TERMINATE_INSTANCE_PREFIX + params.getInstanceId(), verificationCode, 5 * 60 * 1000);
+        customCache.put(CommonUtils.TERMINATE_INSTANCE_PREFIX + params.getInstanceId(), verificationCode,
+                5 * 60 * 1000);
         try (OracleInstanceFetcher fetcher = new OracleInstanceFetcher(sysUserDTO)) {
             OciCfgDetailsRsp.InstanceInfo instanceInfo = fetcher.getInstanceInfo(params.getInstanceId());
             String message = String.format(CommonUtils.TERMINATE_INSTANCE_CODE_MESSAGE_TEMPLATE,
@@ -895,10 +910,12 @@ public class OciServiceImpl implements IOciService {
             return failed;
         }).map(id -> getOciUser(id).getUsername()).collect(Collectors.toList());
 
-        sysService.sendMessage(String.format("【API测活结果】\n\n✅ 有效配置数：%s\n❌ 失效配置数：%s\n\uD83D\uDD11 总配置数：%s\n⚠\uFE0F 失效配置：\n%s",
-                ids.size() - failNames.size(), failNames.size(), ids.size(), String.join("\n", failNames)));
+        sysService.sendMessage(
+                String.format("【API测活结果】\n\n✅ 有效配置数：%s\n❌ 失效配置数：%s\n\uD83D\uDD11 总配置数：%s\n⚠\uFE0F 失效配置：\n%s",
+                        ids.size() - failNames.size(), failNames.size(), ids.size(), String.join("\n", failNames)));
 
-        return String.format(rst, ids.size(), failNames.size(), ids.size() - failNames.size(), String.join(" , ", failNames));
+        return String.format(rst, ids.size(), failNames.size(), ids.size() - failNames.size(),
+                String.join(" , ", failNames));
     }
 
     @Override
@@ -982,7 +999,8 @@ public class OciServiceImpl implements IOciService {
                                     ociUser.getUsername(), sub.getPlanType().getValue());
                         }
                     } catch (Exception e) {
-                        log.warn("[RefreshCfg] user:[{}] fetch planType failed: {}", ociUser.getUsername(), e.getMessage());
+                        log.warn("[RefreshCfg] user:[{}] fetch planType failed: {}", ociUser.getUsername(),
+                                e.getMessage());
                     }
                 } catch (Exception e) {
                     log.warn("[RefreshCfg] user:[{}] alive check failed: {}", ociUser.getUsername(), e.getMessage());
@@ -1007,7 +1025,8 @@ public class OciServiceImpl implements IOciService {
                 fetcher.setCompartmentId(params.getCompartmentId());
             }
 
-            String resStr = String.format("【%s】【%s】", sysUserDTO.getUsername(), fetcher.getInstanceById(params.getInstanceId()).getDisplayName());
+            String resStr = String.format("【%s】【%s】", sysUserDTO.getUsername(),
+                    fetcher.getInstanceById(params.getInstanceId()).getDisplayName());
 
             // 检查并释放 5900 端口
             try {
@@ -1032,8 +1051,7 @@ public class OciServiceImpl implements IOciService {
                         "-t", "rsa",
                         "-b", "4096",
                         "-f", "/root/.ssh/id_rsa",
-                        "-N", ""
-                );
+                        "-N", "");
                 builder.redirectErrorStream(true); // 合并 stdout 和 stderr
                 Process process = builder.start();
 
@@ -1073,11 +1091,13 @@ public class OciServiceImpl implements IOciService {
 
             // 提取 ProxyCommand 并增强
             String proxyCommand = StrUtil.subBetween(updated, "ProxyCommand='", "'");
-            String enhancedProxy = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + proxyCommand.substring(4);
+            String enhancedProxy = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+                    + proxyCommand.substring(4);
             updated = StrUtil.replace(updated, proxyCommand, enhancedProxy);
 
             // 增强主 ssh 命令：禁用交互，不要尝试连接终端
-            updated = StrUtil.replaceFirst(updated, "ssh ", "ssh -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ");
+            updated = StrUtil.replaceFirst(updated, "ssh ",
+                    "ssh -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ");
 
             // 加上 nohup 和 & 确保后台运行
             String finalCommand = "nohup " + updated + " > /dev/null 2>&1 &";
@@ -1110,12 +1130,13 @@ public class OciServiceImpl implements IOciService {
                 BlockstorageClient blockstorageClient = fetcher.getBlockstorageClient();
                 BootVolume bootVolumeByInstanceId = fetcher.getBootVolumeByInstanceId(instanceId);
                 // 检查能否创建AMD实例
-                List<AvailabilityDomain> availabilityDomains = fetcher.getAvailabilityDomains(fetcher.getIdentityClient(), fetcher.getCompartmentId());
-                List<String> shapeList = availabilityDomains.parallelStream().map(availabilityDomain ->
-                                computeClient.listShapes(ListShapesRequest.builder()
-                                        .availabilityDomain(availabilityDomain.getName())
-                                        .compartmentId(fetcher.getCompartmentId())
-                                        .build()).getItems())
+                List<AvailabilityDomain> availabilityDomains = fetcher
+                        .getAvailabilityDomains(fetcher.getIdentityClient(), fetcher.getCompartmentId());
+                List<String> shapeList = availabilityDomains.parallelStream()
+                        .map(availabilityDomain -> computeClient.listShapes(ListShapesRequest.builder()
+                                .availabilityDomain(availabilityDomain.getName())
+                                .compartmentId(fetcher.getCompartmentId())
+                                .build()).getItems())
                         .flatMap(Collection::stream)
                         .map(Shape::getShape)
                         .distinct()
@@ -1138,23 +1159,26 @@ public class OciServiceImpl implements IOciService {
                         .build());
                 log.info("（1/9）✅ 关机成功");
 
-                while (!fetcher.getInstanceById(instanceId).getLifecycleState().getValue().equals(Instance.LifecycleState.Stopped.getValue())) {
+                while (!fetcher.getInstanceById(instanceId).getLifecycleState().getValue()
+                        .equals(Instance.LifecycleState.Stopped.getValue())) {
                     Thread.sleep(1000);
                 }
 
-                while (!fetcher.getBootVolumeByInstanceId(instanceId).getLifecycleState().getValue().equals(BootVolume.LifecycleState.Available.getValue())) {
+                while (!fetcher.getBootVolumeByInstanceId(instanceId).getLifecycleState().getValue()
+                        .equals(BootVolume.LifecycleState.Available.getValue())) {
                     Thread.sleep(1000);
                 }
 
                 // 备份原引导卷
                 log.warn("（2/9）⌛ 正在备份原引导卷");
-                CreateBootVolumeBackupResponse bootVolumeBackup = blockstorageClient.createBootVolumeBackup(CreateBootVolumeBackupRequest.builder()
-                        .createBootVolumeBackupDetails(CreateBootVolumeBackupDetails.builder()
-                                .type(CreateBootVolumeBackupDetails.Type.Full)
-                                .bootVolumeId(bootVolumeByInstanceId.getId())
-                                .displayName("Old-BootVolume-Backup")
-                                .build())
-                        .build());
+                CreateBootVolumeBackupResponse bootVolumeBackup = blockstorageClient
+                        .createBootVolumeBackup(CreateBootVolumeBackupRequest.builder()
+                                .createBootVolumeBackupDetails(CreateBootVolumeBackupDetails.builder()
+                                        .type(CreateBootVolumeBackupDetails.Type.Full)
+                                        .bootVolumeId(bootVolumeByInstanceId.getId())
+                                        .displayName("Old-BootVolume-Backup")
+                                        .build())
+                                .build());
                 BootVolumeBackup oldBootVolumeBackup = bootVolumeBackup.getBootVolumeBackup();
                 log.info("（2/9）✅ 备份原引导卷成功");
 
@@ -1182,8 +1206,9 @@ public class OciServiceImpl implements IOciService {
                 log.info("（4/9）✅ 删除原引导卷成功");
 
                 while (!blockstorageClient.getBootVolume(GetBootVolumeRequest.builder()
-                        .bootVolumeId(bootVolumeByInstanceId.getId())
-                        .build()).getBootVolume().getLifecycleState().getValue().equals(BootVolume.LifecycleState.Terminated.getValue())) {
+                                .bootVolumeId(bootVolumeByInstanceId.getId())
+                                .build()).getBootVolume().getLifecycleState().getValue()
+                        .equals(BootVolume.LifecycleState.Terminated.getValue())) {
                     Thread.sleep(1000);
                 }
 
@@ -1211,7 +1236,8 @@ public class OciServiceImpl implements IOciService {
                 fetcher.setUser(newAmd);
                 InstanceDetailDTO instanceData = fetcher.createInstanceData();
                 if (!instanceData.isSuccess()) {
-                    log.error("用户:[{}],区域:[{}] 创建AMD实例失败", sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion());
+                    log.error("用户:[{}],区域:[{}] 创建AMD实例失败", sysUserDTO.getUsername(),
+                            sysUserDTO.getOciCfg().getRegion());
                     throw new OciException(-1, "创建AMD实例失败");
                 }
                 Instance newAmdInstance = instanceData.getInstance();
@@ -1222,16 +1248,17 @@ public class OciServiceImpl implements IOciService {
                 // 克隆新建实例引导卷
                 log.warn("（6/9）⌛ 正在克隆新建实例引导卷");
                 BootVolume newAmdInstanceBootVolume = fetcher.getBootVolumeByInstanceId(newAmdInstance.getId());
-                CreateBootVolumeResponse cloneBootVolume = blockstorageClient.createBootVolume(CreateBootVolumeRequest.builder()
-                        .createBootVolumeDetails(CreateBootVolumeDetails.builder()
-                                .compartmentId(fetcher.getCompartmentId())
-                                .availabilityDomain(bootVolumeByInstanceId.getAvailabilityDomain())
-                                .sourceDetails(BootVolumeSourceFromBootVolumeDetails.builder()
-                                        .id(newAmdInstanceBootVolume.getId())
+                CreateBootVolumeResponse cloneBootVolume = blockstorageClient
+                        .createBootVolume(CreateBootVolumeRequest.builder()
+                                .createBootVolumeDetails(CreateBootVolumeDetails.builder()
+                                        .compartmentId(fetcher.getCompartmentId())
+                                        .availabilityDomain(bootVolumeByInstanceId.getAvailabilityDomain())
+                                        .sourceDetails(BootVolumeSourceFromBootVolumeDetails.builder()
+                                                .id(newAmdInstanceBootVolume.getId())
+                                                .build())
+                                        .displayName("Cloned-Boot-Volume")
                                         .build())
-                                .displayName("Cloned-Boot-Volume")
-                                .build())
-                        .build());
+                                .build());
                 BootVolume newAmdInstanceCloneBootVolume = cloneBootVolume.getBootVolume();
                 log.info("（6/9）✅ 新建实例引导卷克隆成功");
 
@@ -1244,13 +1271,14 @@ public class OciServiceImpl implements IOciService {
 
                 // 将新建实例的克隆引导卷附加到需要救砖的实例
                 log.warn("（7/9）⌛ 正在将新建实例的克隆引导卷附加到需要救砖的实例");
-                AttachBootVolumeResponse attachedBootVolume = computeClient.attachBootVolume(AttachBootVolumeRequest.builder()
-                        .attachBootVolumeDetails(AttachBootVolumeDetails.builder()
-                                .displayName("New-Boot-Volume")
-                                .bootVolumeId(newAmdInstanceCloneBootVolume.getId())
-                                .instanceId(instanceId)
-                                .build())
-                        .build());
+                AttachBootVolumeResponse attachedBootVolume = computeClient
+                        .attachBootVolume(AttachBootVolumeRequest.builder()
+                                .attachBootVolumeDetails(AttachBootVolumeDetails.builder()
+                                        .displayName("New-Boot-Volume")
+                                        .bootVolumeId(newAmdInstanceCloneBootVolume.getId())
+                                        .instanceId(instanceId)
+                                        .build())
+                                .build());
                 log.info("（7/9）✅ 新建实例的克隆引导卷附加到需要救砖的实例成功");
                 log.info(JSONUtil.toJsonStr(attachedBootVolume.getBootVolumeAttachment()));
 
@@ -1275,7 +1303,8 @@ public class OciServiceImpl implements IOciService {
                 Thread.sleep(3000);
 
                 log.warn("（9/9）⌛ 实例救援成功,正在启动实例...");
-                while (!fetcher.getInstanceById(instanceId).getLifecycleState().getValue().equals(Instance.LifecycleState.Running.getValue())) {
+                while (!fetcher.getInstanceById(instanceId).getLifecycleState().getValue()
+                        .equals(Instance.LifecycleState.Running.getValue())) {
                     try {
                         computeClient.instanceAction(InstanceActionRequest.builder()
                                 .instanceId(instanceId)
@@ -1306,12 +1335,15 @@ public class OciServiceImpl implements IOciService {
     }
 
     public static void addTask(String taskId, Runnable task, long initialDelay, long period, TimeUnit timeUnit) {
-        ScheduledFuture<?> future = CREATE_INSTANCE_POOL.scheduleWithFixedDelay(() -> VIRTUAL_EXECUTOR.execute(task), initialDelay, period, timeUnit);
+        ScheduledFuture<?> future = CREATE_INSTANCE_POOL.scheduleWithFixedDelay(() -> VIRTUAL_EXECUTOR.execute(task),
+                initialDelay, period, timeUnit);
         TASK_MAP.put(taskId, future);
     }
 
-    public static void addAtFixedRateTask(String taskId, Runnable task, long initialDelay, long period, TimeUnit timeUnit) {
-        ScheduledFuture<?> future = CREATE_INSTANCE_POOL.scheduleAtFixedRate(() -> VIRTUAL_EXECUTOR.execute(task), initialDelay, period, timeUnit);
+    public static void addAtFixedRateTask(String taskId, Runnable task, long initialDelay, long period,
+                                          TimeUnit timeUnit) {
+        ScheduledFuture<?> future = CREATE_INSTANCE_POOL.scheduleAtFixedRate(() -> VIRTUAL_EXECUTOR.execute(task),
+                initialDelay, period, timeUnit);
         TASK_MAP.put(taskId, future);
     }
 
@@ -1333,13 +1365,14 @@ public class OciServiceImpl implements IOciService {
         // RUNNING_TASKS 标志只在 finally 块中清除，禁止在 stopAndRemoveTask 中提前移除，
         // 否则会在标志被清除到 finally 执行之间产生竞态窗口，导致下一轮调度趁虚而入、重复开机。
         if (!RUNNING_TASKS.add(taskId)) {
-//            log.warn("【开机任务】任务 [{}] 已在运行中,跳过本轮执行", taskId);
+            // log.warn("【开机任务】任务 [{}] 已在运行中,跳过本轮执行", taskId);
             return;
         }
 
         try (OracleInstanceFetcher fetcher = new OracleInstanceFetcher(sysUserDTO)) {
 
-            List<InstanceDetailDTO> createInstanceList = instanceService.createInstance(fetcher).getCreateInstanceList();
+            List<InstanceDetailDTO> createInstanceList = instanceService.createInstance(fetcher)
+                    .getCreateInstanceList();
             long noShapeCounts = createInstanceList.stream().filter(InstanceDetailDTO::isNoShape).count();
             long noPubVcnCounts = createInstanceList.stream().filter(InstanceDetailDTO::isNoPubVcn).count();
             long successCounts = createInstanceList.stream().filter(InstanceDetailDTO::isSuccess).count();
@@ -1349,10 +1382,12 @@ public class OciServiceImpl implements IOciService {
 
             if (dieCounts > 0) {
                 stopAndRemoveTask(sysUserDTO, createTaskService);
-                log.error("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
+                log.error(
+                        "【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers());
-                sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
+                sysService.sendMessage(String.format(
+                        "【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
                 return;
@@ -1363,9 +1398,10 @@ public class OciServiceImpl implements IOciService {
                 log.error("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 因无有效公网 VCN 而终止任务...",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers());
-                sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 无有效公网 VCN,且无法再创建 VCN,请删除无效的私网 VCN",
-                        sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
-                        sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
+                sysService.sendMessage(
+                        String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 无有效公网 VCN,且无法再创建 VCN,请删除无效的私网 VCN",
+                                sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
+                                sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
                 return;
             }
 
@@ -1374,14 +1410,15 @@ public class OciServiceImpl implements IOciService {
                 log.error("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 因不支持 CPU 架构:[{}] 或配额不足而终止任务...",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers(), sysUserDTO.getArchitecture());
-                sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 因不支持 CPU 架构:[%s] 或配额不足而终止任务",
+                sysService.sendMessage(String.format(
+                        "【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 因不支持 CPU 架构:[%s] 或配额不足而终止任务",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers(), sysUserDTO.getArchitecture()));
                 return;
             }
 
             if (sysUserDTO.getCreateNumbers() == outCounts) {
-//                stopAndRemoveTask(sysUserDTO, createTaskService);
+                // stopAndRemoveTask(sysUserDTO, createTaskService);
                 sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 官方提示配额已超过限制,但任务未终止",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
@@ -1404,12 +1441,15 @@ public class OciServiceImpl implements IOciService {
         } catch (Exception e) {
             if (e instanceof BmcException) {
                 BmcException error = (BmcException) e;
-                if (error.getStatusCode() == 401 || error.getMessage().contains(ErrorEnum.NOT_AUTHENTICATED.getErrorType())) {
+                if (error.getStatusCode() == 401
+                        || error.getMessage().contains(ErrorEnum.NOT_AUTHENTICATED.getErrorType())) {
                     stopAndRemoveTask(sysUserDTO, createTaskService);
-                    log.error("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
+                    log.error(
+                            "【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
                             sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                             sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers());
-                    sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
+                    sysService.sendMessage(String.format(
+                            "【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] 开机失败,可能的原因:(新生成的API暂未生效|账号已无权|账号已封禁\uD83D\uDC7B),请自行登录官方控制台检查。",
                             sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                             sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
                 }
@@ -1417,11 +1457,12 @@ public class OciServiceImpl implements IOciService {
                 log.error("【开机任务】用户:[{}],区域:[{}],系统架构:[{}],开机数量:[{}] 发生了异常:{}",
                         sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
                         sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers(), e.getLocalizedMessage());
-//            stopAndRemoveTask(sysUserDTO, createTaskService);
-//            sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s] " +
-//                            "发生了异常但并未停止枪机任务,可能是网络响应超时等原因,具体情况自行查看日志",
-//                    sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
-//                    sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
+                // stopAndRemoveTask(sysUserDTO, createTaskService);
+                // sysService.sendMessage(String.format("【开机任务】用户:[%s],区域:[%s],系统架构:[%s],开机数量:[%s]
+                // " +
+                // "发生了异常但并未停止枪机任务,可能是网络响应超时等原因,具体情况自行查看日志",
+                // sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
+                // sysUserDTO.getArchitecture(), sysUserDTO.getCreateNumbers()));
             }
         } finally {
             // 统一在此处清除运行标志，禁止在 stopAndRemoveTask 中移除，
@@ -1433,21 +1474,32 @@ public class OciServiceImpl implements IOciService {
     private static void stopAndRemoveTask(SysUserDTO sysUserDTO, IOciCreateTaskService createTaskService) {
         TEMP_MAP.remove(CommonUtils.CREATE_COUNTS_PREFIX + sysUserDTO.getTaskId());
         stopTask(CommonUtils.CREATE_TASK_PREFIX + sysUserDTO.getTaskId());
-        createTaskService.remove(new LambdaQueryWrapper<OciCreateTask>().eq(OciCreateTask::getId, sysUserDTO.getTaskId()));
+        createTaskService
+                .remove(new LambdaQueryWrapper<OciCreateTask>().eq(OciCreateTask::getId, sysUserDTO.getTaskId()));
         // 注意：此处不能移除 RUNNING_TASKS 中的标志，必须由 execCreate 的 finally 块统一清除。
         // 若在此处提前移除，会在本方法返回与 finally 执行之间产生竞态窗口，
         // 导致下一轮调度趁虚而入、重复执行开机操作。
     }
 
+    /**
+     * Execute one round of the change-IP task.
+     *
+     * @param onSuccess optional callback invoked after the task succeeds (e.g. to
+     *                  clean up
+     *                  in-memory task metadata maintained by the caller). May be
+     *                  null.
+     */
     public void execChange(ChangeIpParams params,
                            SysUserDTO sysUserDTO,
                            IInstanceService instanceService,
-                           int randomIntInterval) {
+                           int randomIntInterval,
+                           Runnable onSuccess) {
         List<String> cidrList = params.getCidrList();
         String vnicId = params.getVnicId();
         String instanceId = params.getInstanceId();
         if (CollectionUtil.isEmpty(cidrList)) {
-            Tuple2<String, Instance> tuple2 = instanceService.changeInstancePublicIp(instanceId, vnicId, sysUserDTO, cidrList);
+            Tuple2<String, Instance> tuple2 = instanceService.changeInstancePublicIp(instanceId, vnicId, sysUserDTO,
+                    cidrList);
             if (tuple2.getFirst() == null || tuple2.getSecond() == null) {
                 return;
             }
@@ -1457,22 +1509,24 @@ public class OciServiceImpl implements IOciService {
                     sysUserDTO.getUsername(),
                     sysUserDTO.getOciCfg().getRegion(),
                     tuple2.getSecond().getDisplayName(),
-                    tuple2.getFirst()
-            );
+                    tuple2.getFirst());
             stopTask(CommonUtils.CHANGE_IP_TASK_PREFIX + instanceId);
             TEMP_MAP.remove(CommonUtils.CHANGE_IP_ERROR_COUNTS_PREFIX + instanceId);
+            if (onSuccess != null)
+                onSuccess.run();
             return;
         }
 
-        Tuple2<String, Instance> tuple2 = instanceService.changeInstancePublicIp(instanceId, vnicId, sysUserDTO, cidrList);
+        Tuple2<String, Instance> tuple2 = instanceService.changeInstancePublicIp(instanceId, vnicId, sysUserDTO,
+                cidrList);
         if (tuple2.getFirst() == null || tuple2.getSecond() == null) {
             Long currentCount = (Long) TEMP_MAP.compute(
                     CommonUtils.CHANGE_IP_ERROR_COUNTS_PREFIX + instanceId,
-                    (key, value) -> value == null ? 1L : Long.parseLong(String.valueOf(value)) + 1
-            );
+                    (key, value) -> value == null ? 1L : Long.parseLong(String.valueOf(value)) + 1);
             if (currentCount > 5) {
                 log.error("【更换公共IP】用户:[{}],区域:[{}],实例:[{}],执行更换IP任务失败次数达到5次,任务终止",
-                        sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(), tuple2.getSecond().getDisplayName());
+                        sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
+                        tuple2.getSecond().getDisplayName());
                 stopTask(CommonUtils.CHANGE_IP_TASK_PREFIX + instanceId);
                 TEMP_MAP.remove(CommonUtils.CHANGE_IP_ERROR_COUNTS_PREFIX + instanceId);
             }
@@ -1487,13 +1541,17 @@ public class OciServiceImpl implements IOciService {
             TEMP_MAP.remove(CommonUtils.CHANGE_IP_ERROR_COUNTS_PREFIX + instanceId);
         } else {
             virtualExecutor.execute(() -> updateCfDns(params, publicIp));
-            sendChangeIpMsg(params.getOciCfgId(), sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(), instanceName, publicIp);
+            sendChangeIpMsg(params.getOciCfgId(), sysUserDTO.getUsername(), sysUserDTO.getOciCfg().getRegion(),
+                    instanceName, publicIp);
             stopTask(CommonUtils.CHANGE_IP_TASK_PREFIX + instanceId);
             TEMP_MAP.remove(CommonUtils.CHANGE_IP_ERROR_COUNTS_PREFIX + instanceId);
+            if (onSuccess != null)
+                onSuccess.run();
         }
     }
 
-    private void sendChangeIpMsg(String ociCfgId, String username, String region, String instanceName, String publicIp) {
+    private void sendChangeIpMsg(String ociCfgId, String username, String region, String instanceName,
+                                 String publicIp) {
         customCache.remove(CacheConstant.PREFIX_INSTANCE_PAGE + ociCfgId);
 
         log.info("✔✔✔【更换公共IP】用户:[{}],区域:[{}],实例:[{}],更换公共IP成功,新的公共IP地址:{} ✔✔✔",
@@ -1511,7 +1569,8 @@ public class OciServiceImpl implements IOciService {
             log.info("更换IP成功,开始更新 Cloudflare DNS 记录...");
             CfCfg cfCfg = cfCfgService.getById(params.getSelectedDomainCfgId());
             RemoveCfDnsRecordsParams removeCfDnsRecordsParams = new RemoveCfDnsRecordsParams();
-            removeCfDnsRecordsParams.setProxyDomainList(Collections.singletonList(params.getDomainPrefix() + "." + cfCfg.getDomain()));
+            removeCfDnsRecordsParams
+                    .setProxyDomainList(Collections.singletonList(params.getDomainPrefix() + "." + cfCfg.getDomain()));
             removeCfDnsRecordsParams.setZoneId(cfCfg.getZoneId());
             removeCfDnsRecordsParams.setApiToken(cfCfg.getApiToken());
             cfApiService.removeCfDnsRecords(removeCfDnsRecordsParams);

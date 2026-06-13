@@ -38,6 +38,7 @@ import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
 import jakarta.annotation.Resource;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -219,7 +220,21 @@ public class OciTask implements ApplicationRunner {
                         sysUserDTO.setInterval(Long.valueOf(task.getInterval()));
                         sysUserDTO.setCreateNumbers(task.getCreateNumbers());
                         sysUserDTO.setOperationSystem(task.getOperationSystem());
-                        sysUserDTO.setRootPassword(task.getRootPassword());
+                                                sysUserDTO.setRootPassword(task.getRootPassword());
+
+                        // Pre-seed the attempt counter with an estimated historical count
+                        // so that after a service restart the displayed count is not reset to 0.
+                        // Formula: floor((now - createTime) / intervalSeconds)
+                        if (task.getCreateTime() != null && task.getInterval() != null && task.getInterval() > 0) {
+                            long elapsedSeconds = ChronoUnit.SECONDS.between(task.getCreateTime(), LocalDateTime.now());
+                            long estimatedCount = elapsedSeconds / task.getInterval();
+                            if (estimatedCount > 0) {
+                                TEMP_MAP.put(CommonUtils.CREATE_COUNTS_PREFIX + task.getId(), estimatedCount);
+                                log.info("【开机任务】任务 [{}] 服务重启，预估历史执行次数：[{}] 次，后续将在此基础上累加",
+                                        task.getId(), estimatedCount);
+                            }
+                        }
+
                         addTask(CommonUtils.CREATE_TASK_PREFIX + task.getId(), () ->
                                         execCreate(sysUserDTO, sysService, instanceService, createTaskService),
                                 0, task.getInterval(), TimeUnit.SECONDS);

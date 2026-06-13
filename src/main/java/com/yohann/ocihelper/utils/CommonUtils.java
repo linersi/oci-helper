@@ -91,6 +91,12 @@ public class CommonUtils {
                     "区域： %s\n" +
                     "实例： %s\n" +
                     "新的公网IP： %s";
+    public static final String UPDATE_CFG_MESSAGE_TEMPLATE =
+            "【修改配置任务】\n\n🎉 用户：[%s] 修改实例配置成功 🎉\n" +
+                    "时间： %s\n" +
+                    "区域： %s\n" +
+                    "实例： %s\n" +
+                    "新配置： %s 核 / %s GB";
     public static final String TERMINATE_INSTANCE_MESSAGE_TEMPLATE =
             "【终止实例任务】\n\n用户：[%s] 正在执行终止实例任务\n" +
                     "时间： %s\n" +

@@ -771,8 +771,8 @@ public class SysServiceImpl implements ISysService {
         return rsp;
     }
 
-        @Override
-        public SysUserDTO getOciUser(String ociCfgId) {
+    @Override
+    public SysUserDTO getOciUser(String ociCfgId) {
         OciUser ociUser = userService.getById(ociCfgId);
         // OCI 配置不使用全局代理，只使用专属代理，无则直连
         return SysUserDTO.builder()
@@ -789,8 +789,8 @@ public class SysServiceImpl implements ISysService {
                 .build();
     }
 
-        @Override
-        public SysUserDTO getOciUser(String ociCfgId, String region, String compartmentId) {
+    @Override
+    public SysUserDTO getOciUser(String ociCfgId, String region, String compartmentId) {
         OciUser ociUser = userService.getById(ociCfgId);
         // OCI 配置不使用全局代理，只使用专属代理，无则直连
         return SysUserDTO.builder()
@@ -1239,7 +1239,7 @@ public class SysServiceImpl implements ISysService {
                         log.error("TG Bot Application close error", e);
                     }
                 }
-                                try {
+                try {
                     String globalProxy = getCfgValue(SysCfgEnum.SYS_PROXY);
                     // 将带代理的 OkHttpClient 传入 TelegramBotsLongPollingApplication，
                     // 使得 deleteWebhook 和长轮询请求同样走代理
